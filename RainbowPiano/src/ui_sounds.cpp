@@ -30,47 +30,75 @@
 
 /******************* TINY INTERVAL CLASS ***********************/
 
-bool tiny_interval_t::elapsed() {
-  uint8_t now = tiny_interval(millis());
-  if(now > end) {
+bool tiny_timer_t::elapsed(tiny_time_t duration) {
+  uint8_t now = tiny_time_t::tiny_time(UI::safe_millis());
+  uint8_t elapsed = now - _start;
+  if(elapsed >= duration._duration) {
     return true;
   } else {
     return false;
   }
 }
 
-void tiny_interval_t::wait_for(uint32_t ms) {
-  uint32_t now = millis();
-  end = tiny_interval(now + ms);
-  if(tiny_interval(now + ms*2) < end) {
-    // Avoid special case where timer
-    // might get wedged and stop firing.
-    end = 0;
-  }
+void tiny_timer_t::start() {
+  _start = tiny_time_t::tiny_time(UI::safe_millis());
 }
 
 /******************* SOUND HELPER CLASS ************************/
 
+// Note: SOFT_DECAY does not seem to be necessary. If your
+// hear clicking, chances are the GPIO pins which controls
+// the amp set as input and is floating!
+
+// #define SOFT_DECAY
+
 namespace FTDI {
   SoundPlayer sound; // Global sound player object
-
-  const PROGMEM SoundPlayer::sound_t SoundPlayer::silence[] = {
-    {SILENCE, END_SONG, 0}
-  };
 
   void SoundPlayer::set_volume(uint8_t vol) {
     CLCD::mem_write_8(REG_VOL_SOUND, vol);
   }
 
+  uint8_t SoundPlayer::get_volume() {
+    return CLCD::mem_read_8(REG_VOL_SOUND);
+  }
+
   void SoundPlayer::play(effect_t effect, note_t note) {
-    CLCD::mem_write_16(REG_SOUND, (note << 8) | effect);
-    CLCD::mem_write_8( REG_PLAY,  1);
 
     #if defined(UI_FRAMEWORK_DEBUG)
-      #if defined (SERIAL_PROTOCOLLNPAIR)
-        SERIAL_PROTOCOLPAIR("Playing note ", note);
-        SERIAL_PROTOCOLLNPAIR(", instrument ", effect);
-      #endif
+      SERIAL_ECHO_START();
+      SERIAL_ECHOPAIR("Playing note ", note);
+      SERIAL_ECHOLNPAIR(", instrument ", effect);
+    #endif
+
+    #if defined(SOFT_DECAY)
+      // Soften clicking between notes by fading
+      // down previous note in volume.
+      constexpr uint8_t  decay_step  = 16;
+      constexpr uint16_t decay_uS    = 1e6 / 128;
+      constexpr uint16_t delay_uS    = decay_uS / (2*256/decay_step);
+      const uint8_t saved_volume     = CLCD::mem_read_8(REG_VOL_SOUND);
+
+      // Fade down volume
+      uint8_t v;
+      for(v = saved_volume; v >= decay_step; v -= decay_step) {
+        CLCD::mem_write_8(REG_VOL_SOUND, v);
+        UI:delay_us(delay_uS);
+      }
+    #endif
+
+    // Play the note
+    CLCD::mem_write_16(REG_SOUND, (note == REST) ? 0 : (((note ? note : NOTE_C4) << 8) | effect));
+    CLCD::mem_write_8(REG_PLAY, 1);
+
+    #if defined(SOFT_DECAY)
+      // Fade up volume to full volume once note is struck
+      for(;v <= (saved_volume-decay_step); v += decay_step) {
+        CLCD::mem_write_8(REG_VOL_SOUND, v);
+        UI:delay_us(delay_uS);
+      }
+      CLCD::mem_write_8(REG_VOL_SOUND, saved_volume);
+      UI:delay_us(delay_uS);
     #endif
   }
 
@@ -87,13 +115,25 @@ namespace FTDI {
 
     // Schedule silence to squelch the note after the duration expires.
     sequence = silence;
-    next = tiny_interval_t::tiny_interval(millis() + duration_ms);
+    wait = duration_ms;
+    timer.start();
   }
 
-  void SoundPlayer::play(const sound_t* seq) {
+  void SoundPlayer::play(const sound_t* seq, play_mode_t mode) {
     sequence = seq;
-    // Delaying the start of the sound seems to prevent glitches. Not sure why...
-    next     = tiny_interval_t::tiny_interval(millis()+250);
+    wait     = 250; // Adding this delay causes the note to not be clipped, not sure why.
+    timer.start();
+
+    if(mode == PLAY_ASYNCHRONOUS) return;
+
+    // If playing synchronously, then play all the notes here
+
+    while(has_more_notes()) {
+      onIdle();
+      #if defined(USE_EXTENSIBLE_UI)
+        UI::yield();
+      #endif
+    }
   }
 
   bool SoundPlayer::is_sound_playing() {
@@ -103,29 +143,30 @@ namespace FTDI {
   void SoundPlayer::onIdle() {
     if(!sequence) return;
 
-    const uint8_t tiny_millis = tiny_interval_t::tiny_interval(millis());
-    const bool ready_for_next_note = (next == WAIT) ? !is_sound_playing() : (tiny_millis > next);
+    const bool ready_for_next_note = (wait == 0) ? !is_sound_playing() : timer.elapsed(wait);
 
     if(ready_for_next_note) {
-      const effect_t fx = effect_t(pgm_read_byte_near(&sequence->effect));
-      const note_t   nt =   note_t(pgm_read_byte_near(&sequence->note));
-      const uint16_t ms = uint32_t(pgm_read_byte_near(&sequence->sixteenths)) * 1000 / 16;
+      const effect_t fx = effect_t(pgm_read_byte(&sequence->effect));
+      const note_t   nt =   note_t(pgm_read_byte(&sequence->note));
+      const uint32_t ms = uint32_t(pgm_read_byte(&sequence->sixteenths)) * 1000 / 16;
 
-      if(ms == 0 && fx == SILENCE && nt == 0) {
+      if(ms == 0 && fx == SILENCE && nt == END_SONG) {
         sequence = 0;
         play(SILENCE, REST);
       } else {
-        #if defined(UI_FRAMEWORK_DEBUG)
-          #if defined (SERIAL_PROTOCOLLNPAIR)
-            SERIAL_PROTOCOLLNPAIR("Scheduling note in ", ms);
-          #endif
-        #endif
-        next =   (ms == WAIT) ? 0       : (tiny_interval_t::tiny_interval(millis() + ms));
-        play(fx, (nt == 0)    ? NOTE_C4 : nt);
+        wait = ms;
+        timer.start();
+        play(fx, nt);
         sequence++;
       }
     }
   }
 } // namespace FTDI
+
+namespace UI {
+  void onPlayTone(const uint16_t frequency, const uint16_t duration) {
+    FTDI::sound.play_tone(frequency, duration);
+  }
+}
 
 #endif // EXTENSIBLE_UI

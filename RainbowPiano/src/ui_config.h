@@ -24,11 +24,11 @@
 
 // Define the display module used (see "ftdi_eve_panels.h" for definitions)
 
-//#define LCD_VM800N35A       // FTDI 3.5" 320x240 with FT800
+//#define LCD_VM800B35A       // FTDI 3.5" 320x240 with FT800
 //#define LCD_FT800CB         // Haoyu 5" 480x272 with FT800
 //#define LCD_4DLCD_FT843     // 4D Systems 4.3" 480x272 wuth FT800
 //#define LCD_FT810CB_480x272 // Haoyu FT810CB fitted with a 480x272 panel (non-standard)
-#define LCD_FT810CB           // Haoyu 5" 800x480 with FT810
+#define LCD_FT810CB         // Haoyu 5" 800x480 with FT810
 //#define LCD_AO_CLCD           // Aleph Objects 800x480 Touch UI with FT810
 
 
@@ -50,20 +50,22 @@
     //    (see below for documentation).
 
     // The pins for CS and MOD_RESET (PD) must be chosen.
-    #define CLCD_MOD_RESET                      9  // Arduino
-    #define CLCD_SPI_CS                        10  // Arduino
+    #define CLCD_MOD_RESET                      9
+    #define CLCD_SPI_CS                        10
     //#define CLCD_MOD_RESET                     17  // P3 MiniRambo Pin  5 (RX2/PH0)
     //#define CLCD_SPI_CS                        16  // P3 MiniRambo Pin  3 (TX2/PH1)
+
 
     // If using software SPI, specify pins for SCLK, MOSI, MISO
     //#define CLCD_USE_SOFT_SPI
     #if defined(CLCD_USE_SOFT_SPI)
-        #define CLCD_SOFT_SPI_MOSI             11  // Arduino
-        #define CLCD_SOFT_SPI_MISO             12  // Arduino
-        #define CLCD_SOFT_SPI_SCLK             13  // Arduino
+        #define CLCD_SOFT_SPI_MOSI             11
+        #define CLCD_SOFT_SPI_MISO             12
+        #define CLCD_SOFT_SPI_SCLK             13
         //#define CLCD_SOFT_SPI_MOSI             20  // P3 MiniRambo Pin  8 (SDA/PD1)
         //#define CLCD_SOFT_SPI_MISO             21  // P3 MiniRambo Pin  6 (SCL/PD0)
         //#define CLCD_SOFT_SPI_SCLK             84  // P3 MiniRambo Pin 10 (PH2)
+
     #endif
 
     // If the following is defined, the pin definitions can be

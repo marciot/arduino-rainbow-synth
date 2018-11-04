@@ -29,7 +29,8 @@
 #include "ftdi_eve_dl.h"
 
 #include "ui_builder.h"
- 
-CommandProcessor::highlight_func_t  *CommandProcessor::_highlight_callback;
+
+CommandProcessor::btn_style_func_t  *CommandProcessor::_btn_style_callback = nullptr;
+bool CommandProcessor::is_tracking = false;
 
 #endif // EXTENSIBLE_UI

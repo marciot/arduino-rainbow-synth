@@ -35,13 +35,13 @@
 #include "ui_builder.h"
 #include "ui_event_loop.h"
 
-namespace Extensible_UI_API {
+namespace UI {
   void onStartup();
-  void onUpdate();
+  void onIdle();
 }
 
 using namespace FTDI;
-using namespace Extensible_UI_API;
+using namespace UI;
 
 class InterfaceScreen : public UIScreen {
   public:

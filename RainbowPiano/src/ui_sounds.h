@@ -25,31 +25,49 @@
 
 /******************* TINY INTERVAL CLASS ***********************/
 
-/* tiny_interval() downsamples a 32-bit millis() value
+/* Helpful Reference:
+ *
+ *  https://arduino.stackexchange.com/questions/12587/how-can-i-handle-the-millis-rollover
+ */
+
+/* tiny_interval_t downsamples a 32-bit millis() value
    into a 8-bit value which can record periods of
    a few seconds with a rougly 1/16th of second
    resolution. This allows us to measure small
    intervals without needing to use four-byte counters.
-
-   However, dues to wrap-arounds, this class may
-   have a burst of misfires every 16 seconds or so and
-   thus should only be used where this is harmless and
-   memory savings outweigh accuracy.
  */
-class tiny_interval_t {
+class tiny_time_t {
   private:
-    uint8_t end;
+    friend class tiny_timer_t;
+    uint8_t _duration;
+
+    static uint8_t tiny_time(uint32_t ms) {return ceil(float(ms) / 64);};
+    //static uint8_t tiny_time(uint32_t ms) {return ms >> 6;}; // This doesn't work.
 
   public:
-    static uint8_t tiny_interval(uint32_t ms) {return uint8_t(ms / 64);}
+    tiny_time_t()            : _duration(0) {}
+    tiny_time_t(uint32_t ms) : _duration(tiny_time(ms)) {}
+    tiny_time_t & operator=   (uint32_t ms) {_duration = tiny_time(ms); return *this;}
+    bool          operator == (uint32_t ms) {return _duration == tiny_time(ms);}
+};
 
-    void wait_for(uint32_t ms);
-    bool elapsed();
+class tiny_timer_t {
+  private:
+    uint8_t _start;
+
+  public:
+    void start();
+    bool elapsed(tiny_time_t interval);
 };
 
 /******************* SOUND HELPER CLASS ************************/
 
 namespace FTDI {
+  typedef enum {
+    PLAY_ASYNCHRONOUS,
+    PLAY_SYNCHRONOUS
+  } play_mode_t;
+
   class SoundPlayer {
     public:
       struct sound_t {
@@ -60,20 +78,21 @@ namespace FTDI {
 
       const uint8_t WAIT = 0;
 
-      static const PROGMEM sound_t silence[];
-
     private:
-      const sound_t *sequence;
-      uint8_t       next;
+      const sound_t   *sequence;
+      tiny_timer_t     timer;
+      tiny_time_t      wait;
 
       note_t frequency_to_midi_note(const uint16_t frequency);
 
     public:
       static void set_volume(uint8_t volume);
+      static uint8_t get_volume();
+
       static void play(effect_t effect, note_t note = NOTE_C4);
       static bool is_sound_playing();
 
-      void play(const sound_t* seq);
+      void play(const sound_t* seq, play_mode_t mode = PLAY_SYNCHRONOUS);
       void play_tone(const uint16_t frequency_hz, const uint16_t duration_ms);
       bool has_more_notes() {return sequence != 0;};
 
@@ -101,6 +120,10 @@ namespace FTDI {
      all zeros.
    */
 
+  const PROGMEM SoundPlayer::sound_t silence[] = {
+    {SILENCE,      END_SONG, 0}
+  };
+
   const PROGMEM SoundPlayer::sound_t chimes[] = {
     {CHIMES,       NOTE_G3,  5},
     {CHIMES,       NOTE_E4,  5},
@@ -116,14 +139,14 @@ namespace FTDI {
     {SILENCE,      END_SONG, 0}
   };
 
-  const PROGMEM SoundPlayer::sound_t c_maj_arpeggio[] = {
+  const PROGMEM SoundPlayer::sound_t twinkle[] = {
     {GLOCKENSPIEL, NOTE_C4,  1},
     {GLOCKENSPIEL, NOTE_E4,  1},
     {GLOCKENSPIEL, NOTE_G4,  16},
     {SILENCE,      END_SONG, 0}
   };
 
-  const PROGMEM SoundPlayer::sound_t start_print[] = {
+  const PROGMEM SoundPlayer::sound_t fanfare[] = {
     {TRUMPET,      NOTE_A3,  4},
     {SILENCE,      REST,     1},
     {TRUMPET,      NOTE_A3,  2},
@@ -146,34 +169,270 @@ namespace FTDI {
     {SILENCE,      END_SONG, 0}
   };
 
+  const PROGMEM SoundPlayer::sound_t js_bach_toccata[] = {
+    {ORGAN,        NOTE_A4,  2},
+    {ORGAN,        NOTE_G4,  2},
+    {ORGAN,        NOTE_A4,  35},
+    {SILENCE,      REST,     12},
+    {ORGAN,        NOTE_G4,  4},
+    {ORGAN,        NOTE_F4,  4},
+    {ORGAN,        NOTE_E4,  4},
+    {ORGAN,        NOTE_D4,  4},
+    {ORGAN,        NOTE_C4S, 16},
+    {ORGAN,        NOTE_D4,  32},
+    {SILENCE,      REST,     42},
+
+    {ORGAN,        NOTE_A3,  2},
+    {ORGAN,        NOTE_G3,  2},
+    {ORGAN,        NOTE_A3,  35},
+    {SILENCE,      REST,     9},
+    {ORGAN,        NOTE_E3,  8},
+    {ORGAN,        NOTE_F3,  8},
+    {ORGAN,        NOTE_C3S, 16},
+    {ORGAN,        NOTE_D3,  27},
+    {SILENCE,      REST,     42},
+
+    {ORGAN,        NOTE_A2,  2},
+    {ORGAN,        NOTE_G2,  2},
+    {ORGAN,        NOTE_A2,  35},
+    {SILENCE,      REST,     12},
+    {ORGAN,        NOTE_G2,  4},
+    {ORGAN,        NOTE_F2,  4},
+    {ORGAN,        NOTE_E2,  4},
+    {ORGAN,        NOTE_D2,  4},
+    {ORGAN,        NOTE_C2S, 16},
+    {ORGAN,        NOTE_D2,  32},
+    {SILENCE,      REST,     52},
+
+    //{ORGAN,        NOTE_D1,  28},
+    {ORGAN,        NOTE_C3S, 9},
+    {ORGAN,        NOTE_E3,  9},
+    {ORGAN,        NOTE_G3,  9},
+    {ORGAN,        NOTE_A3S, 9},
+    {ORGAN,        NOTE_C4S, 9},
+    {ORGAN,        NOTE_E4,  70},
+    {ORGAN,        NOTE_D4,  70},
+    {SILENCE,      REST,     30},
+
+    {ORGAN,        NOTE_C4S, 4},
+    {ORGAN,        NOTE_D4,  2},
+    {ORGAN,        NOTE_E4,  2},
+
+    {ORGAN,        NOTE_C4S, 2},
+    {ORGAN,        NOTE_D4,  2},
+    {ORGAN,        NOTE_E4,  2},
+
+    {ORGAN,        NOTE_C4S, 2},
+    {ORGAN,        NOTE_D4,  2},
+    {ORGAN,        NOTE_E4,  2},
+
+    {ORGAN,        NOTE_C4S, 2},
+    {ORGAN,        NOTE_D4,  4},
+    {ORGAN,        NOTE_E4,  4},
+    {ORGAN,        NOTE_F4,  2},
+    {ORGAN,        NOTE_G4,  2},
+
+    {ORGAN,        NOTE_E4,  2},
+    {ORGAN,        NOTE_F4,  2},
+    {ORGAN,        NOTE_G4,  2},
+
+    {ORGAN,        NOTE_E4,  2},
+    {ORGAN,        NOTE_F4,  2},
+    {ORGAN,        NOTE_G4,  2},
+
+    {ORGAN,        NOTE_E4,  2},
+    {ORGAN,        NOTE_F4,  4},
+    {ORGAN,        NOTE_G4,  4},
+    {ORGAN,        NOTE_A4,  2},
+    {ORGAN,        NOTE_A4S, 2},
+
+    {ORGAN,        NOTE_G4,  2},
+    {ORGAN,        NOTE_A4,  2},
+    {ORGAN,        NOTE_A4S, 2},
+
+    {ORGAN,        NOTE_G4,  2},
+    {ORGAN,        NOTE_A4,  2},
+    {ORGAN,        NOTE_A4S, 2},
+
+    {ORGAN,        NOTE_G4,  2},
+    {ORGAN,        NOTE_A4,  4},
+    {SILENCE,      REST,     36},
+
+
+    {ORGAN,        NOTE_C5S, 4},
+    {ORGAN,        NOTE_D5,  2},
+    {ORGAN,        NOTE_E5,  2},
+
+    {ORGAN,        NOTE_C5S, 2},
+    {ORGAN,        NOTE_D5,  2},
+    {ORGAN,        NOTE_E5,  2},
+
+    {ORGAN,        NOTE_C5S, 2},
+    {ORGAN,        NOTE_D5,  2},
+    {ORGAN,        NOTE_E5,  2},
+
+    {ORGAN,        NOTE_C5S, 2},
+    {ORGAN,        NOTE_D5,  4},
+    {ORGAN,        NOTE_E5,  4},
+    {ORGAN,        NOTE_F5,  2},
+    {ORGAN,        NOTE_G5,  2},
+
+    {ORGAN,        NOTE_E5,  2},
+    {ORGAN,        NOTE_F5,  2},
+    {ORGAN,        NOTE_G5,  2},
+
+    {ORGAN,        NOTE_E5,  2},
+    {ORGAN,        NOTE_F5,  2},
+    {ORGAN,        NOTE_G5,  2},
+
+    {ORGAN,        NOTE_E5,  2},
+    {ORGAN,        NOTE_F5,  4},
+    {ORGAN,        NOTE_G5,  4},
+    {ORGAN,        NOTE_A5,  2},
+    {ORGAN,        NOTE_A5S, 2},
+
+    {ORGAN,        NOTE_G5,  2},
+    {ORGAN,        NOTE_A5,  2},
+    {ORGAN,        NOTE_A5S, 2},
+
+    {ORGAN,        NOTE_G5,  2},
+    {ORGAN,        NOTE_A5,  2},
+    {ORGAN,        NOTE_A5S, 2},
+
+    {ORGAN,        NOTE_G5,  2},
+    {ORGAN,        NOTE_A5,  4},
+    {SILENCE,      REST,     32},
+
+    {ORGAN,        NOTE_A5,  4},
+    {ORGAN,        NOTE_G5,  2},
+    {ORGAN,        NOTE_A5S, 2},
+
+    {ORGAN,        NOTE_E5,  2},
+    {ORGAN,        NOTE_G5,  2},
+    {ORGAN,        NOTE_A5S, 2},
+
+    {ORGAN,        NOTE_E5,  2},
+    {ORGAN,        NOTE_F5,  2},
+    {ORGAN,        NOTE_A5,  2},
+
+    {ORGAN,        NOTE_D5,  2},
+    {ORGAN,        NOTE_F5,  2},
+    {ORGAN,        NOTE_G5,  2},
+
+    {ORGAN,        NOTE_D5,  2},
+    {ORGAN,        NOTE_E5,  2},
+    {ORGAN,        NOTE_A5,  2},
+
+    {ORGAN,        NOTE_C5,  2},
+    {ORGAN,        NOTE_E5,  2},
+    {ORGAN,        NOTE_A5,  2},
+
+    {ORGAN,        NOTE_C5,  2},
+    {ORGAN,        NOTE_D5,  2},
+    {ORGAN,        NOTE_F5,  2},
+
+    {ORGAN,        NOTE_A4S, 2},
+    {ORGAN,        NOTE_D5,  2},
+    {ORGAN,        NOTE_E5,  2},
+
+    {ORGAN,        NOTE_A4S, 2},
+    {ORGAN,        NOTE_C5,  2},
+    {ORGAN,        NOTE_E5,  2},
+  };
+
   const PROGMEM SoundPlayer::sound_t js_bach_joy[] = {
     {PIANO,        NOTE_G3,  4},
     {PIANO,        NOTE_A3,  4},
     {PIANO,        NOTE_B3,  4},
-    {PIANO,        NOTE_D4,  4},
+    {PIANO,        NOTE_D4,  3},
+    {SILENCE,      REST,     1},
+
+    {PIANO,        NOTE_C4,  3},
+    {SILENCE,      REST,     1},
     {PIANO,        NOTE_C4,  4},
-    {PIANO,        NOTE_C4,  4},
-    {PIANO,        NOTE_E4,  4},
+    {PIANO,        NOTE_E4,  3},
+    {SILENCE,      REST,     1},
+    {PIANO,        NOTE_D4,  2},
+    {SILENCE,      REST,     2},
+
     {PIANO,        NOTE_D4,  4},
-    {PIANO,        NOTE_D4,  4},
-    {PIANO,        NOTE_G4 , 4},
+    {PIANO,        NOTE_G4 , 3},
+    {SILENCE,      REST,     1},
     {PIANO,        NOTE_F4S, 4},
     {PIANO,        NOTE_G4,  4},
-    {PIANO,        NOTE_D4,  4},
-    {PIANO,        NOTE_B3,  4},
+
+    {PIANO,        NOTE_D4,  2},
+    {SILENCE,      REST,     2},
+    {PIANO,        NOTE_B3,  3},
+    {SILENCE,      REST,     1},
     {PIANO,        NOTE_G3,  4},
-    {PIANO,        NOTE_A3,  4},
-    {PIANO,        NOTE_B3,  4},
+    {PIANO,        NOTE_A3,  2},
+    {SILENCE,      REST,     2},
+
+    {PIANO,        NOTE_B3,  2},
+    {SILENCE,      REST,     2},
     {PIANO,        NOTE_C4,  4},
+    {PIANO,        NOTE_D4,  2},
+    {SILENCE,      REST,     2},
+    {PIANO,        NOTE_E4,  2},
+    {SILENCE,      REST,     2},
+
     {PIANO,        NOTE_D4,  4},
-    {PIANO,        NOTE_E4,  4},
-    {PIANO,        NOTE_D4,  4},
-    {PIANO,        NOTE_C4,  4},
-    {PIANO,        NOTE_B3,  4},
+    {PIANO,        NOTE_C4,  2},
+    {SILENCE,      REST,     2},
+    {PIANO,        NOTE_B3,  2},
+    {SILENCE,      REST,     2},
     {PIANO,        NOTE_A3,  4},
-    {PIANO,        NOTE_B3,  4},
-    {PIANO,        NOTE_G3,  4},
-    {PIANO,        NOTE_G3,  4},
+
+    {PIANO,        NOTE_B3,  2},
+    {SILENCE,      REST,     2},
+    {PIANO,        NOTE_G3,  2},
+    {SILENCE,      REST,     2},
+    {PIANO,        NOTE_G3,  8},
+    {SILENCE,      END_SONG, 0}
+  };
+
+  const PROGMEM SoundPlayer::sound_t drumkit[] = {
+    {SILENCE,      REST,     8},
+    {NOTCH,        NOTE_C4,  8},
+    {KICKDRUM,     NOTE_C4,  8},
+    {HIHAT,        NOTE_C4,  8},
+    {COWBELL,      NOTE_C4,  8},
+    {SILENCE,      REST,     8},
+    {NOTCH,        NOTE_C4,  8},
+    {KICKDRUM,     NOTE_C4,  8},
+    {HIHAT,        NOTE_C4,  8},
+    {COWBELL,      NOTE_C4,  8},
+    {SILENCE,      REST,     8},
+    {NOTCH,        NOTE_C4,  8},
+    {KICKDRUM,     NOTE_C4,  8},
+    {HIHAT,        NOTE_C4,  8},
+    {COWBELL,      NOTE_C4,  8},
+    {SILENCE,      END_SONG, 0}
+  };
+
+  const PROGMEM SoundPlayer::sound_t beeping[] = {
+    {BEEPING,      NOTE_C4,  64},
+    {SILENCE,      END_SONG, 0}
+  };
+
+  const PROGMEM SoundPlayer::sound_t alarm[] = {
+    {ALARM,        NOTE_C4,  64},
+    {SILENCE,      END_SONG, 0}
+  };
+
+  const PROGMEM SoundPlayer::sound_t warble[] = {
+    {WARBLE,       NOTE_C4,  64},
+    {SILENCE,      END_SONG, 0}
+  };
+
+  const PROGMEM SoundPlayer::sound_t carousel[] = {
+    {CAROUSEL,     NOTE_C4,  64},
+    {SILENCE,      END_SONG, 0}
+  };
+
+  const PROGMEM SoundPlayer::sound_t pips[] = {
+    {SHORT_PIPS_3, NOTE_C4,  16},
     {SILENCE,      END_SONG, 0}
   };
 

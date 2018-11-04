@@ -43,7 +43,7 @@ class PianoScreen : public InterfaceScreen {
     static uint8_t  highlighted_instrument;
     static CRGB     leds[NUM_LEDS];
 
-    static void highlightCallback(uint8_t tag, bool enabled);
+    static void buttonStyleCallback(uint8_t tag, bool enabled);
     static uint32_t getNoteColor(uint8_t tag);
   public:
     static void onEntry();
@@ -87,13 +87,13 @@ void PianoScreen::onEntry() {
   
   InterfaceScreen::onEntry();
   sound.set_volume(volume);
-  enable_touch_sound(false);
+  UIData::enable_touch_sounds(false);
 
   CLCD::turn_on_backlight();
   CLCD::set_brightness(LCD_BRIGHTNESS);
 
   CommandProcessor cmd;
-  cmd.set_highlight_callback(highlightCallback);
+  cmd.set_button_style_callback(buttonStyleCallback);
 
   FastLED.addLeds<NEOPIXEL, LED_PIN>(leds, NUM_LEDS);
   FastLED.setBrightness( LED_BRIGHTNESS );
@@ -169,7 +169,7 @@ uint32_t PianoScreen::getNoteColor(uint8_t tag) {
   }
 }
 
-void PianoScreen::highlightCallback(uint8_t tag, bool enabled) {
+void PianoScreen::buttonStyleCallback(uint8_t tag, bool enabled) {
   CommandProcessor cmd;
 
   // Highlight the selected instrument
@@ -203,6 +203,7 @@ void PianoScreen::highlightCallback(uint8_t tag, bool enabled) {
 }
 
 void PianoScreen::onTouchStart(uint8_t tag) {
+  CommandProcessor cmd;
   switch(tag) {
     case 241: highlighted_instrument = tag; instrument = PIANO;        break;
     case 242: highlighted_instrument = tag; instrument = ORGAN;        break;
@@ -217,7 +218,7 @@ void PianoScreen::onTouchStart(uint8_t tag) {
     case 251: highlighted_instrument = tag; instrument = BELL;         break;
     case 252: highlighted_instrument = tag; instrument = HIHAT;        break;
     #define GRID_COLS 6
-    case 240: start_tracking (BTN_POS(5,1), BTN_SIZE(2,3), 240, true); break;
+    case 240: cmd.track_circular (BTN_POS(5,1), BTN_SIZE(2,3), 240); break;
     default:
       const uint32_t color = getNoteColor(tag);
       for(int i = 0; i < NUM_LEDS; i++) {
@@ -271,5 +272,5 @@ void setup() {
 }
 
 void loop() {
-  onUpdate();
+  onIdle();
 }

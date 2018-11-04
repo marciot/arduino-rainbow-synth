@@ -23,12 +23,42 @@
 #ifndef _UI_EVENT_LOOP_
 #define _UI_EVENT_LOOP_
 
-#define DISPLAY_UPDATE_INTERVAL    1000
-#define TRACKING_UPDATE_INTERVAL     50
+#define STATUS_UPDATE_INTERVAL     1000
+#define TOUCH_UPDATE_INTERVAL        50
 #define TOUCH_REPEATS_PER_SECOND      4
-#define DEBOUNCE_PERIOD             100
+#define DEBOUNCE_PERIOD             150
 
-void enable_touch_sound(bool enabled);
-void start_tracking(int16_t x, int16_t y, int16_t w, int16_t h, int16_t tag, bool rotary);
+class UIData {
+  private:
+    typedef union {
+      struct {
+        bool touch_start_sound  : 1;
+        bool touch_end_sound    : 1;
+        bool touch_repeat_sound : 1;
+        bool show_animations    : 1;
+        bool touch_debouncing   : 1;
+        bool ignore_unpress     : 1;
+      } bits;
+      uint8_t value;
+    } flags_t;
+
+  public:
+    static flags_t flags;
+
+    static uint8_t get_value();
+    static void set_value(uint8_t);
+    static void enable_touch_sounds(bool enabled);
+    static bool touch_sounds_enabled();
+    static void enable_animations(bool enabled);
+    static bool animations_enabled();
+    static void reset_value() {
+      flags.bits.touch_start_sound  = flags.bits.touch_end_sound = true;
+      flags.bits.touch_repeat_sound = flags.bits.show_animations = true;
+      flags.bits.touch_debouncing   = flags.bits.ignore_unpress = false;
+    }
+};
+
+uint8_t get_pressed_tag();
+bool    is_touch_held();
 
 #endif // _UI_EVENT_LOOP_

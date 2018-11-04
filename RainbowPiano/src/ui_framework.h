@@ -22,6 +22,8 @@
 #ifndef _UI_FRAMEWORK_H_
 #define _UI_FRAMEWORK_H_
 
+#include "ui.h"
+
 typedef enum {
   BACKGROUND  = 1,
   FOREGROUND  = 2,
@@ -49,11 +51,7 @@ typedef enum {
   className::onTouchEnd \
 }
 
-#define GET_METHOD(type, method) reinterpret_cast<method##_func_t*>( \
-  sizeof(functionTable[type].method##_ptr) == 2 ? \
-    pgm_read_word_near(&functionTable[type].method##_ptr) : \
-    pgm_read_dword_near(&functionTable[type].method##_ptr) \
-  )
+#define GET_METHOD(type, method) reinterpret_cast<method##_func_t*>(pgm_read_ptr_far(&functionTable[type].method##_ptr))
 #define SCREEN_TABLE             PROGMEM const ScreenRef::table_t ScreenRef::functionTable[] =
 #define SCREEN_TABLE_POST        const uint8_t ScreenRef::functionTableSize = sizeof(ScreenRef::functionTable)/sizeof(ScreenRef::functionTable[0]);
 
@@ -127,9 +125,8 @@ class ScreenStack : public ScreenRef {
     void goTo(onRedraw_func_t s);
     void goBack();
 
-    uint8_t getScreen() {
-      return getType();
-    }
+    uint8_t peek()      {return stack[0];}
+    uint8_t getScreen() {return getType();}
 };
 
 extern ScreenStack current_screen;
@@ -144,12 +141,14 @@ class UIScreen {
     static void onEntry()              {current_screen.onRefresh();}
     static void onExit()               {}
     static void onIdle()               {}
-    static bool onTouchStart(uint8_t)  {return false;}
+    static bool onTouchStart(uint8_t)  {return true;}
     static bool onTouchHeld(uint8_t)   {return false;}
-    static bool onTouchEnd(uint8_t)    {return false;}
+    static bool onTouchEnd(uint8_t)    {return true;}
 };
 
-#define GOTO_SCREEN(screen) current_screen.goTo(screen::onRedraw);
-#define GOTO_PREVIOUS()     current_screen.goBack();
+#define GOTO_SCREEN(screen)   current_screen.goTo(screen::onRedraw);
+#define GOTO_PREVIOUS()       current_screen.goBack();
+#define AT_SCREEN(screen)     (current_screen.getType() == current_screen.lookupScreen(screen::onRedraw))
+#define IS_PARENT_SCREEN(screen) (current_screen.peek() == current_screen.lookupScreen(screen::onRedraw))
 
 #endif // _UI_FRAMEWORK_H_

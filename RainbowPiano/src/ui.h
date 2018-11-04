@@ -25,12 +25,24 @@
 //#include "../ui_api.h"
 #include "ui_config.h"
 
-#if defined(_MARLIN_CONFIG_H_)
-    // If _MARLIN_CONFIG_H_ exists, then we are being
+#if defined(MMM_TO_MMS)
+    // If MMM_TO_MMS exists, then we are being
     // compiled inside Marlin.
     #define USE_MARLIN_IO
 #else
     #include "Arduino.h"
+
+    #ifndef pgm_read_word_far
+    #define pgm_read_word_far pgm_read_word
+    #endif
+
+    #ifndef pgm_read_dword_far
+    #define pgm_read_dword_far pgm_read_dword
+    #endif
+    
+    #ifndef pgm_read_ptr_far
+    #define pgm_read_ptr_far pgm_read_ptr
+    #endif
 
     // Load up compatibility routines
     #define EXTENSIBLE_UI
@@ -43,6 +55,18 @@
     #define WELCOME_MSG     "Printer Ready"
     #define MSG_SD_INSERTED "Media Inserted"
     #define MSG_SD_REMOVED  "Media Removed"
+
+    #define SERIAL_ECHO_START()
+    #define SERIAL_ECHOLNPGM(str)        Serial.println(F(str))
+    #define SERIAL_ECHOPGM(str)          Serial.print(F(str))
+    #define SERIAL_ECHOLNPAIR(str, val) {Serial.print(F(str)); Serial.println(value);}
+
+    #define safe_delay delay
+    
+    namespace UI {
+      static inline uint32_t safe_millis() {return millis();};
+      static inline void     yield()       {};
+    };
 #endif
 
 #endif // _UI_CONFIG_H_
