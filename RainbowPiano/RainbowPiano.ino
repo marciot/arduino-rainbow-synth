@@ -290,12 +290,12 @@ void SongsScreen::onRedraw(draw_mode_t what) {
      .cmd(CLEAR(true,true,true));
      
   #define GRID_ROWS 5
-  #define GRID_COLS 3
+  #define GRID_COLS 5
   
   cmd.font(font_large)
      .fgcolor(0x111111)
-     .text(BTN_POS(1,1), BTN_SIZE(3,1), F("Effects and Songs"))
-     .font(font_medium)
+     .text(BTN_POS(1,1), BTN_SIZE(5,1), F("Effects and Songs"))
+     .font(font_small)
      .tag(2).button( BTN_POS(1,2), BTN_SIZE(1,1), F("Chimes"))
      .tag(3).button( BTN_POS(1,3), BTN_SIZE(1,1), F("Sad Trombone"))
      .tag(4).button( BTN_POS(1,4), BTN_SIZE(1,1), F("Twinkle"))
@@ -305,8 +305,13 @@ void SongsScreen::onRedraw(draw_mode_t what) {
      .tag(8).button( BTN_POS(3,2), BTN_SIZE(1,1), F("Bach Toccata"))
      .tag(9).button( BTN_POS(3,3), BTN_SIZE(1,1), F("Bach Joy"))
      .tag(10).button(BTN_POS(3,4), BTN_SIZE(1,1), F("Big Band"))
-     
-     .tag(1).button( BTN_POS(1,5), BTN_SIZE(3,1), F("Back"));
+     .tag(11).button(BTN_POS(4,2), BTN_SIZE(1,1), F("Beeping"))
+     .tag(12).button(BTN_POS(4,3), BTN_SIZE(1,1), F("Alarm"))
+     .tag(13).button(BTN_POS(4,4), BTN_SIZE(1,1), F("Warble"))
+     .tag(14).button(BTN_POS(5,2), BTN_SIZE(1,1), F("Carousel"))
+     .tag(15).button(BTN_POS(5,3), BTN_SIZE(1,1), F("Beats"))
+  #define MARGIN_T  15
+     .tag(1).button( BTN_POS(1,5), BTN_SIZE(5,1), F("Back"));
      
   #undef GRID_ROWS
   #undef GRID_COLS
@@ -328,6 +333,11 @@ void SongsScreen::onTouchEnd(uint8_t tag) {
     case  8: sound.play(js_bach_toccata, mode);  break;
     case  9: sound.play(js_bach_joy, mode);      break;
     case 10: sound.play(big_band, mode);         break;
+    case 11: sound.play(beeping, mode);          break;
+    case 12: sound.play(alarm, mode);            break;
+    case 13: sound.play(warble, mode);           break;
+    case 14: sound.play(carousel, mode);         break;
+    case 15: sound.play(beats, mode);            break;
   }
 }
 
