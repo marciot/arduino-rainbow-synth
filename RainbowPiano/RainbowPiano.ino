@@ -24,8 +24,6 @@
 #define LCD_BRIGHTNESS 255
 
 // Margin around the buttons
-#define MARGIN_L  10
-#define MARGIN_R  10
 #define MARGIN_T  10
 #define MARGIN_B  10
 
@@ -43,17 +41,25 @@ class PianoScreen : public InterfaceScreen {
     static uint8_t  highlighted_instrument;
     static CRGB     leds[NUM_LEDS];
 
-    static void buttonStyleCallback(uint8_t tag, bool enabled);
+    static void buttonStyleCallback(uint8_t tag, uint8_t &style, uint16_t &options, bool post);
     static uint32_t getNoteColor(uint8_t tag);
   public:
     static void onEntry();
+    static void onExit();
     static void onRedraw(draw_mode_t what);
     static void onTouchStart(uint8_t tag);
     static void onIdle();
 };
 
+class SongsScreen : public InterfaceScreen {
+  public:
+    static void onRedraw(draw_mode_t what);
+    static void onTouchEnd(uint8_t tag);
+};
+
 SCREEN_TABLE {
-  DECL_SCREEN(PianoScreen)
+  DECL_SCREEN(PianoScreen),
+  DECL_SCREEN(SongsScreen)
 };
 SCREEN_TABLE_POST
 
@@ -99,38 +105,46 @@ void PianoScreen::onEntry() {
   FastLED.setBrightness( LED_BRIGHTNESS );
 }
 
+void PianoScreen::onExit() {
+  InterfaceScreen::onExit();
+  CommandProcessor cmd;
+  cmd.set_button_style_callback(NULL);
+}
+
 void PianoScreen::onRedraw(draw_mode_t what) {
   CommandProcessor cmd;
-  cmd.cmd(CLEAR_COLOR_RGB(0x000000))
+  cmd.cmd(CLEAR_COLOR_RGB(0x222222))
      .cmd(CLEAR(true,true,true));
 
-  #define MARGIN_L  1
-  #define MARGIN_R  1
+  #define MARGIN_L  3
+  #define MARGIN_R  3
+  #define MARGIN_T  3
+  #define MARGIN_B  3
   
   #define GRID_ROWS 8
-  
-  #define GRID_COLS 6
+  #define GRID_COLS 12
   cmd.font(font_small)
-     .fgcolor(black)
-     .tag(241).button( BTN_POS(1,1), BTN_SIZE(1,1), F("Piano"))
-     .tag(242).button( BTN_POS(1,2), BTN_SIZE(1,1), F("Organ"))
-     .tag(243).button( BTN_POS(1,3), BTN_SIZE(1,1), F("Harp"))
-          
-     .tag(244).button( BTN_POS(2,1), BTN_SIZE(1,1), F("Xylophone"))
-     .tag(245).button( BTN_POS(2,2), BTN_SIZE(1,1), F("Glockenspeil"))
-     .tag(246).button( BTN_POS(2,3), BTN_SIZE(1,1), F("Sine"))
+     .fgcolor(0x111111)
+     .tag(241).button( BTN_POS(1,1), BTN_SIZE(2,1), F("Piano"))
+     .tag(242).button( BTN_POS(1,2), BTN_SIZE(2,1), F("Organ"))
+     .tag(243).button( BTN_POS(1,3), BTN_SIZE(2,1), F("Harp"))
 
-     .tag(247).button( BTN_POS(3,1), BTN_SIZE(1,1), F("Tuba"))
-     .tag(248).button( BTN_POS(3,2), BTN_SIZE(1,1), F("Trumpet"))
-     .tag(249).button( BTN_POS(3,3), BTN_SIZE(1,1), F("Music Box"))
-     
-     .tag(250).button( BTN_POS(4,1), BTN_SIZE(1,1), F("Chimes"))
-     .tag(251).button( BTN_POS(4,2), BTN_SIZE(1,1), F("Bell"))
-     .tag(252).button( BTN_POS(4,3), BTN_SIZE(1,1), F("Drum Kit"))
-     .fgcolor(black)
-     .tag(240).dial  ( BTN_POS(5,1), BTN_SIZE(2,3), dial_min + (dial_max - dial_min) / 255 * volume);
+     .tag(247).button( BTN_POS(3,1), BTN_SIZE(2,1), F("Tuba"))
+     .tag(251).button( BTN_POS(3,2), BTN_SIZE(2,1), F("Bell"))     
+     .tag(246).button( BTN_POS(3,3), BTN_SIZE(2,1), F("Sine"))
+
+     .tag(250).button( BTN_POS(5,1), BTN_SIZE(2,1), F("Chimes"))
+     .tag(248).button( BTN_POS(5,2), BTN_SIZE(2,1), F("Trumpet"))
+     .tag(249).button( BTN_POS(5,3), BTN_SIZE(2,1), F("Music Box"))
+
+     .tag(244).button( BTN_POS(7,1), BTN_SIZE(3,1), F("Xylophone"))
+     .tag(245).button( BTN_POS(7,2), BTN_SIZE(3,1), F("Glockenspeil"))
+     .tag(252).button( BTN_POS(7,3), BTN_SIZE(2,1), F("Drum Kit"))
+     .tag(239).button( BTN_POS(9,3), BTN_SIZE(1,1), F("..."))
+     .tag(240).dial  ( BTN_POS(10,1), BTN_SIZE(3,3), dial_min + (dial_max - dial_min) / 255 * volume);
 
   #define NUM_OCTAVES 2
+  #undef  GRID_COLS
   #define GRID_COLS (NUM_OCTAVES*14)
 
   for(int octave = 0; octave < NUM_OCTAVES; octave++) {
@@ -150,6 +164,8 @@ void PianoScreen::onRedraw(draw_mode_t what) {
        .tag(octave*12 + 9) .button( BTN_POS(octave*14 + 10,4), BTN_SIZE(2,3), F(""), OPT_FLAT)
        .tag(octave*12 + 11).button( BTN_POS(octave*14 + 12,4), BTN_SIZE(2,3), F(""), OPT_FLAT);
   }
+  
+  #undef GRID_COLS
 }
 
 uint32_t PianoScreen::getNoteColor(uint8_t tag) {
@@ -169,7 +185,7 @@ uint32_t PianoScreen::getNoteColor(uint8_t tag) {
   }
 }
 
-void PianoScreen::buttonStyleCallback(uint8_t tag, bool enabled) {
+void PianoScreen::buttonStyleCallback(uint8_t tag, uint8_t &style, uint16_t &options, bool post) {
   CommandProcessor cmd;
 
   // Highlight the selected instrument
@@ -205,6 +221,7 @@ void PianoScreen::buttonStyleCallback(uint8_t tag, bool enabled) {
 void PianoScreen::onTouchStart(uint8_t tag) {
   CommandProcessor cmd;
   switch(tag) {
+    case 239: GOTO_SCREEN(SongsScreen); break;
     case 241: highlighted_instrument = tag; instrument = PIANO;        break;
     case 242: highlighted_instrument = tag; instrument = ORGAN;        break;
     case 243: highlighted_instrument = tag; instrument = HARP;         break;
@@ -262,6 +279,55 @@ void PianoScreen::onIdle() {
       onRefresh();
       break;
     default: return;
+  }
+}
+
+/***************************** SONGS SCREEN *****************************/
+
+void SongsScreen::onRedraw(draw_mode_t what) {
+  CommandProcessor cmd;
+  cmd.cmd(CLEAR_COLOR_RGB(0x222222))
+     .cmd(CLEAR(true,true,true));
+     
+  #define GRID_ROWS 5
+  #define GRID_COLS 3
+  
+  cmd.font(font_large)
+     .fgcolor(0x111111)
+     .text(BTN_POS(1,1), BTN_SIZE(3,1), F("Effects and Songs"))
+     .font(font_medium)
+     .tag(2).button( BTN_POS(1,2), BTN_SIZE(1,1), F("Chimes"))
+     .tag(3).button( BTN_POS(1,3), BTN_SIZE(1,1), F("Sad Trombone"))
+     .tag(4).button( BTN_POS(1,4), BTN_SIZE(1,1), F("Twinkle"))
+     .tag(5).button( BTN_POS(2,2), BTN_SIZE(1,1), F("Fanfare"))
+     .tag(6).button( BTN_POS(2,3), BTN_SIZE(1,1), F("USB In"))
+     .tag(7).button( BTN_POS(2,4), BTN_SIZE(1,1), F("USB Out"))
+     .tag(8).button( BTN_POS(3,2), BTN_SIZE(1,1), F("Bach Toccata"))
+     .tag(9).button( BTN_POS(3,3), BTN_SIZE(1,1), F("Bach Joy"))
+     .tag(10).button(BTN_POS(3,4), BTN_SIZE(1,1), F("Big Band"))
+     
+     .tag(1).button( BTN_POS(1,5), BTN_SIZE(3,1), F("Back"));
+     
+  #undef GRID_ROWS
+  #undef GRID_COLS
+}
+
+void SongsScreen::onTouchEnd(uint8_t tag) {
+  CommandProcessor cmd;
+  /* See "src/ui_sounds.h" for sound sequences */
+  
+  constexpr play_mode_t mode = PLAY_ASYNCHRONOUS;
+  switch(tag) {
+    case  1: GOTO_SCREEN(PianoScreen);           break;
+    case  2: sound.play(chimes, mode);           break;
+    case  3: sound.play(sad_trombone, mode);     break;
+    case  4: sound.play(twinkle, mode);          break;
+    case  5: sound.play(fanfare, mode);          break;
+    case  6: sound.play(media_inserted, mode);   break;
+    case  7: sound.play(media_removed, mode);    break;
+    case  8: sound.play(js_bach_toccata, mode);  break;
+    case  9: sound.play(js_bach_joy, mode);      break;
+    case 10: sound.play(big_band, mode);         break;
   }
 }
 

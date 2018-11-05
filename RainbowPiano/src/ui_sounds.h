@@ -391,6 +391,29 @@ namespace FTDI {
     {PIANO,        NOTE_G3,  8},
     {SILENCE,      END_SONG, 0}
   };
+  
+  const PROGMEM SoundPlayer::sound_t big_band[] = {
+    {XYLOPHONE,    NOTE_F4,  3},
+    {XYLOPHONE,    NOTE_G4,  3},
+    {XYLOPHONE,    NOTE_F4,  3},
+    {XYLOPHONE,    NOTE_D4,  3},
+    {XYLOPHONE,    NOTE_A3S, 3},
+    {SILENCE, REST,     3},
+    
+    {TRUMPET,    NOTE_F4,  3},
+    {TRUMPET,    NOTE_G4,  3},
+    {TRUMPET,    NOTE_F4,  3},
+    {TRUMPET,    NOTE_D4,  3},
+    {TRUMPET,    NOTE_A3S, 3},
+    {SILENCE, REST,     3},
+    
+    {TUBA,    NOTE_A2S, 6},
+    {TUBA,    NOTE_A2S, 6},
+    {TUBA,    NOTE_A2S, 4},
+    {TUBA,    NOTE_A2S, 6},
+    {TUBA,    NOTE_A2S, 6},
+    {SILENCE, END_SONG, 0}
+  };
 
   const PROGMEM SoundPlayer::sound_t drumkit[] = {
     {SILENCE,      REST,     8},
